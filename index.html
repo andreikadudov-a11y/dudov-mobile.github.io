@@ -4,9 +4,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>События вокруг!</title>
+    <title>События рядом</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
     <style>
+        /* Оставил твои стили */
         html, body {
             height: 100%;
             margin: 0;
@@ -85,51 +86,60 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
+    let map; // 🔥 Переменная объявлена снаружи
+
     function openExternalLink(url) {
         window.open(url, '_blank');
     }
 
-    async function initMap(lat, lon) {
-        const map = L.map('map').setView([lat, lon], 12);
+    async function loadMarkers(lat, lon) {
+        const response = await fetch('https://raw.githubusercontent.com/andreikadudov-a11y/base-ss/refs/heads/main/points.json');
+        const data = await response.json();
+
+        data.forEach(point => {
+            const marker = L.marker([point.lat, point.lon])
+                .bindPopup(`
+                    <p class="popup-title">${point.title}</p>
+                    <p class="popup-text">${point.description}</p>
+                    <img style="width: 90%; max-height: 90px; object-fit: cover;" src="${point.imageUrl}">
+                    <a href="#" class="popup-button" onclick="openExternalLink('${point.source}')">Подробнее</a>
+                `)
+                .addTo(map);
+
+            L.circle([point.lat, point.lon], {
+                color: 'green',
+                fillColor: '#008000',
+                fillOpacity: 0.3,
+                radius: point.radius
+            }).addTo(map);
+        });
+    }
+
+    function createMap(lat, lon) {
+        map = L.map('map').setView([lat, lon], 12, {
+            animate: true,
+            duration: 1.5
+        });
 
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap'
         }).addTo(map);
 
-        const data = await fetch('https://raw.githubusercontent.com/andreikadudov-a11y/base-ss/refs/heads/main/points.json')
-            .then(resp => resp.json());
-
-        data.forEach(p => {
-            const marker = L.marker([p.lat, p.lon]).addTo(map);
-
-            marker.bindPopup(`
-                <p class="popup-title">${p.title}</p>
-                <p class="popup-text">${p.description}</p>
-                <img style="width: 90%; max-height: 90px; object-fit: cover;" src="${p.imageUrl}">
-                <a href="#" class="popup-button" onclick="openExternalLink('${p.source}')">Подробнее</a>
-            `);
-
-            L.circle([p.lat, p.lon], {
-                color: 'green',
-                fillColor: '#008000',
-                fillOpacity: 0.3,
-                radius: p.radius
-            }).addTo(map);
-        });
+        loadMarkers(lat, lon);
     }
 
     document.addEventListener('DOMContentLoaded', () => {
         const fallback = [58.311389, 82.902688];
 
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-                pos => initMap(pos.coords.latitude, pos.coords.longitude),
-                () => initMap(...fallback),
-                { timeout: 3000 }
-            );
-        } else {
-            initMap(...fallback);
+        if (!navigator.geolocation) {
+            createMap(...fallback);
+            return;
         }
+
+        navigator.geolocation.getCurrentPosition(
+            pos => createMap(pos.coords.latitude, pos.coords.longitude),
+            err => createMap(...fallback)
+        );
     });
 </script>
 </body>
